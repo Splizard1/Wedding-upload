@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Share your wedding photos</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #f8f4ef;
+        color: #292421;
+      }
+
+      main {
+        width: min(100%, 480px);
+        padding: 32px 24px;
+        border-radius: 18px;
+        background: white;
+        box-shadow: 0 8px 35px rgba(0, 0, 0, 0.08);
+        text-align: center;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      input[type="file"] {
+        display: block;
+        width: 100%;
+        margin: 24px 0;
+        padding: 16px;
+        border: 2px dashed #aaa;
+        border-radius: 12px;
+      }
+
+      button {
+        width: 100%;
+        padding: 15px;
+        border: 0;
+        border-radius: 10px;
+        background: #292421;
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+
+      #status {
+        min-height: 24px;
+        margin-top: 18px;
+      }
+
+      .success {
+        color: #17723d;
+      }
+
+      .error {
+        color: #b42318;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Share your photos</h1>
+
+      <p>
+        Thank you for celebrating with us! Upload any photos or videos you took
+        today.
+      </p>
+
+      <form id="upload-form">
+        <input
+          id="files"
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          required
+        />
+
+        <button id="upload-button" type="submit">
+          Upload photos and videos
+        </button>
+      </form>
+
+      <p id="status"></p>
+    </main>
+
+    <script>
+      const form = document.querySelector("#upload-form");
+      const fileInput = document.querySelector("#files");
+      const button = document.querySelector("#upload-button");
+      const status = document.querySelector("#status");
+
+      const parameters = new URLSearchParams(window.location.search);
+      const eventToken = parameters.get("code");
+
+      function setStatus(message, className = "") {
+        status.textContent = message;
+        status.className = className;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!eventToken) {
+          setStatus("This upload link is invalid.", "error");
+          return;
+        }
+
+        const files = Array.from(fileInput.files);
+
+        if (files.length === 0) {
+          setStatus("Please select at least one file.", "error");
+          return;
+        }
+
+        button.disabled = true;
+
+        try {
+          for (let index = 0; index < files.length; index++) {
+            const file = files[index];
+
+            const contentType = file.type || "application/octet-stream";
+
+            setStatus(
+              `Preparing file ${index + 1} of ${files.length}: ${file.name}`,
+            );
+
+            const urlResponse = await fetch("/api/upload-url", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-event-token": eventToken,
+              },
+              body: JSON.stringify({
+                file_name: file.name,
+                content_type: contentType,
+                size: file.size,
+              }),
+            });
+
+            if (!urlResponse.ok) {
+              throw new Error(await urlResponse.text());
+            }
+
+            const { upload_url: uploadUrl } = await urlResponse.json();
+
+            setStatus(
+              `Uploading file ${index + 1} of ${files.length}: ${file.name}`,
+            );
+
+            const uploadResponse = await fetch(uploadUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Type": contentType,
+              },
+              body: file,
+            });
+
+            if (!uploadResponse.ok) {
+              throw new Error(
+                `Upload failed with status ${uploadResponse.status}.`,
+              );
+            }
+          }
+
+          fileInput.value = "";
+          setStatus("Upload complete — thank you!", "success");
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || "The upload failed.", "error");
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
