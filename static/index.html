@@ -316,6 +316,30 @@
       .message-status.error {
         color: var(--error);
       }
+      .site-credit {
+        margin: 28px 0 0;
+        color: var(--muted);
+        font-size: 0.75rem;
+        text-align: center;
+        opacity: 0.7;
+      }
+
+      .site-credit a {
+        color: var(--sage-dark);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .site-credit a:hover {
+        text-decoration: underline;
+        opacity: 1;
+      }
+
+      .site-credit a:focus-visible {
+        outline: 2px solid var(--sage);
+        outline-offset: 3px;
+        border-radius: 3px;
+      }
 
       @media (max-width: 420px) {
         body {
@@ -442,6 +466,13 @@
       ></div>
 
       <p class="footer-message">♡</p>
+
+      <p class="site-credit">
+        Made with
+        <a href="https://spliz.biz" target="_blank" rel="noopener noreferrer">
+          ☄
+        </a>
+      </p>
     </main>
 
     <script>
@@ -467,11 +498,11 @@
 
       const parameters = new URLSearchParams(window.location.search);
 
+      const eventToken = parameters.get("code");
+
       if (eventToken) {
         sessionStorage.setItem("weddingEventToken", eventToken);
       }
-
-      const eventToken = parameters.get("code");
 
       function setStatus(message, type) {
         statusBox.textContent = message;
