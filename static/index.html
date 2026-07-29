@@ -384,7 +384,7 @@
             type="text"
             maxlength="100"
             autocomplete="name"
-            placeholder="e.g. Sarah and Tom"
+            placeholder="Enter your name..."
             required
           />
 
@@ -442,6 +442,16 @@
       const cameraInput = document.querySelector("#camera-input");
 
       const statusBox = document.querySelector("#status");
+
+      const messageForm = document.querySelector("#message-form");
+
+      const guestNameInput = document.querySelector("#guest-name");
+
+      const guestMessageInput = document.querySelector("#guest-message");
+
+      const messageButton = document.querySelector("#message-button");
+
+      const messageStatus = document.querySelector("#message-status");
 
       const parameters = new URLSearchParams(window.location.search);
 
