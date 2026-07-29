@@ -2,6 +2,7 @@
 name = "wedding-uploads"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.94.1"
 
 [dependencies]
 aws-config = "1.10.1"
