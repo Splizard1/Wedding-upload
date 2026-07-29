@@ -1,0 +1,13 @@
+[package]
+name = "wedding-uploads"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aws-config = "1.10.1"
+aws-sdk-s3 = "1.140.0"
+axum = "0.8.9"
+dotenvy = "0.15.7"
+serde = { version = "1.0.229", features = ["derive"] }
+tokio = { version = "1.53.1", features = ["full"] }
+uuid = { version = "1.24.0", features = ["v4"] }
