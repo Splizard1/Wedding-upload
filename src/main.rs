@@ -125,7 +125,7 @@ async fn create_upload_url(
         ));
     }
 
-    // We generate the stored filename ourselves to avoid collisions and to prevent users from overwriting each other's files.
+    // We generate the stored filename ourselves 
     let object_key = format!(
         "wedding/{}/{}.{}",
         "guest-uploads",
