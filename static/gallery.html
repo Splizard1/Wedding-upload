@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Our Wedding Gallery</title>
+
+    <style>
+      :root {
+        --sage: #9eae98;
+        --sage-dark: #687a63;
+        --sage-light: #dce4d8;
+        --cream: #fffdf8;
+        --text: #343b32;
+        --muted: #667063;
+        --gold: #b79b64;
+        --error: #a33b32;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(255, 255, 255, 0.28),
+            transparent 35%
+          ),
+          linear-gradient(145deg, var(--sage-light), var(--sage));
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .page {
+        width: min(1200px, 100%);
+        margin: 0 auto;
+        padding: 28px 18px 60px;
+      }
+
+      .header {
+        margin-bottom: 32px;
+        padding: 34px 24px;
+        text-align: center;
+        background: var(--cream);
+        border: 1px solid rgba(104, 122, 99, 0.25);
+        border-radius: 24px;
+        box-shadow: 0 15px 40px rgba(55, 68, 52, 0.15);
+      }
+
+      .decoration {
+        color: var(--gold);
+        font-family: Georgia, serif;
+        font-size: 2rem;
+      }
+
+      h1,
+      h2 {
+        color: var(--sage-dark);
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        font-size: clamp(2rem, 8vw, 3.4rem);
+      }
+
+      .subtitle {
+        margin: 0 auto 22px;
+        max-width: 550px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .back-link {
+        display: inline-flex;
+        min-height: 46px;
+        padding: 12px 18px;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        background: var(--sage-dark);
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .section {
+        margin-top: 30px;
+      }
+
+      .section-heading {
+        margin-bottom: 18px;
+        text-align: center;
+      }
+
+      .section-heading h2 {
+        margin: 0 0 6px;
+        font-size: 1.8rem;
+      }
+
+      .section-heading p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 18px;
+      }
+
+      .media-card {
+        min-width: 0;
+        overflow: hidden;
+        background: var(--cream);
+        border: 1px solid rgba(104, 122, 99, 0.25);
+        border-radius: 17px;
+        box-shadow: 0 10px 28px rgba(55, 68, 52, 0.13);
+      }
+
+      .media-preview {
+        width: 100%;
+        height: 260px;
+        display: block;
+        object-fit: cover;
+        background: #e8ece5;
+      }
+
+      video.media-preview {
+        object-fit: contain;
+        background: #20231f;
+      }
+
+      .media-actions {
+        padding: 13px;
+      }
+
+      .open-link {
+        width: 100%;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--sage-dark);
+        background: var(--sage-light);
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .preview-error {
+        height: 260px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .message-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      .message-card {
+        padding: 23px;
+        background: var(--cream);
+        border: 1px solid rgba(104, 122, 99, 0.25);
+        border-radius: 17px;
+        box-shadow: 0 10px 28px rgba(55, 68, 52, 0.13);
+      }
+
+      .message-name {
+        margin: 0 0 12px;
+        color: var(--sage-dark);
+        font-family: Georgia, serif;
+        font-size: 1.25rem;
+      }
+
+      .message-text {
+        margin: 0;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .message-date {
+        margin: 17px 0 0;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .loading,
+      .empty,
+      .error {
+        padding: 28px;
+        color: var(--muted);
+        background: var(--cream);
+        border-radius: 17px;
+        text-align: center;
+      }
+
+      .error {
+        color: var(--error);
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      @media (max-width: 520px) {
+        .page {
+          padding: 14px 12px 40px;
+        }
+
+        .header {
+          padding: 30px 18px;
+          border-radius: 19px;
+        }
+
+        .media-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .media-preview,
+        .preview-error {
+          height: 340px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="page">
+      <header class="header">
+        <div class="decoration" aria-hidden="true">❦</div>
+
+        <h1>Our wedding gallery</h1>
+
+        <p class="subtitle">
+          A collection of memories, photographs, videos and messages shared by
+          everyone celebrating with us.
+        </p>
+
+        <a class="back-link" href="/"> Share something </a>
+      </header>
+
+      <div id="loading" class="loading">Loading the wedding memories…</div>
+
+      <div id="error" class="error" hidden></div>
+
+      <section id="media-section" class="section" hidden>
+        <div class="section-heading">
+          <h2>Photos and videos</h2>
+          <p id="media-count"></p>
+        </div>
+
+        <div id="media-grid" class="media-grid"></div>
+
+        <div id="media-empty" class="empty" hidden>
+          No photos or videos have been shared yet.
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const loadingElement = document.querySelector("#loading");
+
+      const errorElement = document.querySelector("#error");
+
+      const mediaSection = document.querySelector("#media-section");
+
+      const mediaGrid = document.querySelector("#media-grid");
+
+      const mediaCount = document.querySelector("#media-count");
+
+      const mediaEmpty = document.querySelector("#media-empty");
+
+      function createMediaCard(item) {
+        const card = document.createElement("article");
+        card.className = "media-card";
+
+        let preview;
+
+        if (item.kind === "video") {
+          preview = document.createElement("video");
+          preview.controls = true;
+          preview.playsInline = true;
+          preview.preload = "metadata";
+        } else {
+          preview = document.createElement("img");
+          preview.alt = "A wedding photo shared by a guest";
+          preview.loading = "lazy";
+        }
+
+        preview.className = "media-preview";
+        preview.src = item.url;
+
+        preview.addEventListener("error", () => {
+          const fallback = document.createElement("div");
+
+          fallback.className = "preview-error";
+          fallback.textContent =
+            "This format cannot be previewed by this browser. " +
+            "Use the button below to open it.";
+
+          preview.replaceWith(fallback);
+        });
+
+        const actions = document.createElement("div");
+        actions.className = "media-actions";
+
+        const openLink = document.createElement("a");
+        openLink.className = "open-link";
+        openLink.href = item.url;
+        openLink.target = "_blank";
+        openLink.rel = "noopener";
+        openLink.textContent =
+          item.kind === "video" ? "Open video" : "Open photo";
+
+        actions.append(openLink);
+        card.append(preview, actions);
+
+        return card;
+      }
+
+      async function loadGallery() {
+        try {
+          const response = await fetch("/api/gallery");
+
+          if (!response.ok) {
+            const message = await response.text();
+
+            throw new Error(message || "The gallery could not be loaded.");
+          }
+
+          const gallery = await response.json();
+
+          mediaCount.textContent =
+            `${gallery.media.length} shared item` +
+            `${gallery.media.length === 1 ? "" : "s"}`;
+
+          for (const item of gallery.media) {
+            mediaGrid.append(createMediaCard(item));
+          }
+
+          mediaEmpty.hidden = gallery.media.length !== 0;
+          mediaSection.hidden = false;
+
+          mediaSection.hidden = false;
+          messageSection.hidden = false;
+        } catch (error) {
+          console.error(error);
+
+          errorElement.textContent =
+            error.message || "Something went wrong while loading the gallery.";
+
+          errorElement.hidden = false;
+        } finally {
+          loadingElement.hidden = true;
+        }
+      }
+
+      loadGallery();
+    </script>
+  </body>
+</html>

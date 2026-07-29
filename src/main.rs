@@ -9,12 +9,8 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{env, path::Path};
-use std::time::{
-    Duration,
-    SystemTime,
-    UNIX_EPOCH,
-};
 use uuid::Uuid;
 
 const MAX_FILE_SIZE: u64 = 1_000_000_000; // 1 GB per file
@@ -22,6 +18,18 @@ const MAX_FILE_SIZE: u64 = 1_000_000_000; // 1 GB per file
 const ALLOWED_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "mp4", "mov", "m4v", "webm",
 ];
+
+#[derive(Serialize)]
+struct GalleryMedia {
+    url: String,
+    kind: String,
+}
+
+#[derive(Serialize)]
+struct GalleryResponse {
+    media: Vec<GalleryMedia>,
+}
+
 #[derive(Deserialize)]
 struct MessageRequest {
     name: String,
@@ -74,11 +82,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         event_token: env::var("EVENT_TOKEN")?,
     };
 
-let app = Router::new()
-    .route("/", get(index))
-    .route("/api/upload-url", post(create_upload_url))
-    .route("/api/message", post(save_message))
-    .with_state(state);
+    let app = Router::new()
+        .route("/", get(index))
+        .route("/gallery", get(gallery))
+        .route("/api/gallery", get(get_gallery))
+        .route("/api/upload-url", post(create_upload_url))
+        .route("/api/message", post(save_message))
+        .with_state(state);
 
     // Railway automatically supplies PORT.
     let port: u16 = env::var("PORT")
@@ -148,7 +158,7 @@ async fn create_upload_url(
         ));
     }
 
-    // We generate the stored filename ourselves 
+    // Generate the stored filename on the server to avoid collisions and to prevent users from guessing the URLs of other people's uploads.
     let object_key = format!(
         "wedding/{}/{}.{}",
         "guest-uploads",
@@ -190,10 +200,7 @@ async fn save_message(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(request): Json<MessageRequest>,
-) -> Result<
-    (StatusCode, Json<MessageResponse>),
-    (StatusCode, String),
-> {
+) -> Result<(StatusCode, Json<MessageResponse>), (StatusCode, String)> {
     check_event_token(&headers, &state.event_token)?;
 
     let name = request.name.trim();
@@ -245,21 +252,16 @@ async fn save_message(
         submitted_at,
     };
 
-    let json = serde_json::to_vec_pretty(&record)
-        .map_err(|error| {
-            eprintln!("Message serialization error: {error:?}");
+    let json = serde_json::to_vec_pretty(&record).map_err(|error| {
+        eprintln!("Message serialization error: {error:?}");
 
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not save the message.".to_string(),
-            )
-        })?;
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not save the message.".to_string(),
+        )
+    })?;
 
-    let object_key = format!(
-        "wedding/messages/{}-{}.json",
-        submitted_at,
-        Uuid::new_v4()
-    );
+    let object_key = format!("wedding/messages/{}-{}.json", submitted_at, Uuid::new_v4());
 
     state
         .s3
@@ -286,6 +288,104 @@ async fn save_message(
         }),
     ))
 }
+
+async fn get_gallery(
+    State(state): State<AppState>,
+) -> Result<Json<GalleryResponse>, (StatusCode, String)> {
+    let media_keys = list_object_keys(&state, "wedding/guest-uploads/").await?;
+
+    let mut media = Vec::new();
+
+    for key in media_keys {
+        let extension = Path::new(&key)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+
+        let kind = match extension.as_str() {
+            "mp4" | "mov" | "m4v" | "webm" => "video",
+            _ => "image",
+        };
+
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(6 * 60 * 60))
+            .map_err(|error| {
+                eprintln!("Gallery presigning configuration error: {error:?}");
+
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not load the gallery.".to_string(),
+                )
+            })?;
+
+        let presigned_request = state
+            .s3
+            .get_object()
+            .bucket(&state.bucket)
+            .key(&key)
+            .presigned(presigning_config)
+            .await
+            .map_err(|error| {
+                eprintln!("Gallery presigning error: {error:?}");
+
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not load the gallery.".to_string(),
+                )
+            })?;
+
+        media.push(GalleryMedia {
+            url: presigned_request.uri().to_string(),
+            kind: kind.to_string(),
+        });
+    }
+
+    Ok(Json(GalleryResponse { media }))
+}
+
+async fn list_object_keys(
+    state: &AppState,
+    prefix: &str,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    let mut keys = Vec::new();
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut request = state
+            .s3
+            .list_objects_v2()
+            .bucket(&state.bucket)
+            .prefix(prefix);
+
+        if let Some(token) = continuation_token.as_deref() {
+            request = request.continuation_token(token);
+        }
+
+        let output = request.send().await.map_err(|error| {
+            eprintln!("Could not list objects under {prefix}: {error:?}");
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not load the gallery.".to_string(),
+            )
+        })?;
+
+        for object in output.contents() {
+            if let Some(key) = object.key() {
+                keys.push(key.to_string());
+            }
+        }
+
+        continuation_token = output.next_continuation_token().map(str::to_owned);
+
+        if continuation_token.is_none() {
+            break;
+        }
+    }
+
+    Ok(keys)
+}
+
 fn check_event_token(
     headers: &HeaderMap,
     expected_token: &str,
@@ -302,4 +402,7 @@ fn check_event_token(
     }
 
     Ok(())
+}
+async fn gallery() -> Html<&'static str> {
+    Html(include_str!("../static/gallery.html"))
 }
