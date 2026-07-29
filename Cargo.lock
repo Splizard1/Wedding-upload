@@ -2416,6 +2416,7 @@ dependencies = [
  "axum",
  "dotenvy",
  "serde",
+ "serde_json",
  "tokio",
  "uuid",
 ]

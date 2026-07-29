@@ -1,4 +1,5 @@
 use aws_config::BehaviorVersion;
+use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::{Client, presigning::PresigningConfig};
 use axum::{
     Json, Router,
@@ -8,7 +9,12 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use std::{env, path::Path, time::Duration};
+use std::{env, path::Path};
+use std::time::{
+    Duration,
+    SystemTime,
+    UNIX_EPOCH,
+};
 use uuid::Uuid;
 
 const MAX_FILE_SIZE: u64 = 1_000_000_000; // 1 GB per file
@@ -16,7 +22,23 @@ const MAX_FILE_SIZE: u64 = 1_000_000_000; // 1 GB per file
 const ALLOWED_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "mp4", "mov", "m4v", "webm",
 ];
+#[derive(Deserialize)]
+struct MessageRequest {
+    name: String,
+    message: String,
+}
 
+#[derive(Serialize)]
+struct MessageRecord {
+    name: String,
+    message: String,
+    submitted_at: u64,
+}
+
+#[derive(Serialize)]
+struct MessageResponse {
+    message: String,
+}
 #[derive(Clone)]
 struct AppState {
     s3: Client,
@@ -52,10 +74,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         event_token: env::var("EVENT_TOKEN")?,
     };
 
-    let app = Router::new()
-        .route("/", get(index))
-        .route("/api/upload-url", post(create_upload_url))
-        .with_state(state);
+let app = Router::new()
+    .route("/", get(index))
+    .route("/api/upload-url", post(create_upload_url))
+    .route("/api/message", post(save_message))
+    .with_state(state);
 
     // Railway automatically supplies PORT.
     let port: u16 = env::var("PORT")
@@ -163,7 +186,106 @@ async fn create_upload_url(
         object_key,
     }))
 }
+async fn save_message(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<MessageRequest>,
+) -> Result<
+    (StatusCode, Json<MessageResponse>),
+    (StatusCode, String),
+> {
+    check_event_token(&headers, &state.event_token)?;
 
+    let name = request.name.trim();
+    let message = request.message.trim();
+
+    if name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Please enter your name.".to_string(),
+        ));
+    }
+
+    if name.chars().count() > 100 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "The name must be 100 characters or fewer.".to_string(),
+        ));
+    }
+
+    if message.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Please enter a message.".to_string(),
+        ));
+    }
+
+    if message.chars().count() > 2_000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "The message must be 2,000 characters or fewer.".to_string(),
+        ));
+    }
+
+    let submitted_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| {
+            eprintln!("System time error: {error:?}");
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not save the message.".to_string(),
+            )
+        })?
+        .as_secs();
+
+    let record = MessageRecord {
+        name: name.to_string(),
+        message: message.to_string(),
+        submitted_at,
+    };
+
+    let json = serde_json::to_vec_pretty(&record)
+        .map_err(|error| {
+            eprintln!("Message serialization error: {error:?}");
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not save the message.".to_string(),
+            )
+        })?;
+
+    let object_key = format!(
+        "wedding/messages/{}-{}.json",
+        submitted_at,
+        Uuid::new_v4()
+    );
+
+    state
+        .s3
+        .put_object()
+        .bucket(&state.bucket)
+        .key(object_key)
+        .content_type("application/json")
+        .body(ByteStream::from(json))
+        .send()
+        .await
+        .map_err(|error| {
+            eprintln!("Message upload error: {error:?}");
+
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not save the message.".to_string(),
+            )
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(MessageResponse {
+            message: "Your message has been saved.".to_string(),
+        }),
+    ))
+}
 fn check_event_token(
     headers: &HeaderMap,
     expected_token: &str,

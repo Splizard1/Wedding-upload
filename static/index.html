@@ -214,6 +214,101 @@
         font-family: Georgia, serif;
         font-style: italic;
       }
+      .message-section {
+        position: relative;
+        z-index: 1;
+        margin-top: 30px;
+        text-align: left;
+      }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 25px;
+        color: var(--muted);
+        font-family: Georgia, serif;
+        font-style: italic;
+        text-align: center;
+      }
+
+      .divider::before,
+      .divider::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: rgba(104, 122, 99, 0.25);
+      }
+
+      .message-section h2 {
+        margin: 0;
+        color: var(--sage-dark);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.55rem;
+        font-weight: 500;
+        text-align: center;
+      }
+
+      .message-introduction {
+        margin: 9px 0 20px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      .message-section label {
+        display: block;
+        margin: 15px 0 7px;
+        color: var(--text);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .message-section input,
+      .message-section textarea {
+        width: 100%;
+        padding: 13px 14px;
+        color: var(--text);
+        background: white;
+        border: 1px solid rgba(104, 122, 99, 0.4);
+        border-radius: 11px;
+        font: inherit;
+      }
+
+      .message-section textarea {
+        min-height: 125px;
+        resize: vertical;
+      }
+
+      .message-section input:focus,
+      .message-section textarea:focus {
+        border-color: var(--sage-dark);
+        outline: 3px solid rgba(158, 174, 152, 0.2);
+      }
+
+      .message-button {
+        margin-top: 18px;
+        color: white;
+        background: var(--sage-dark);
+        box-shadow: 0 8px 20px rgba(104, 122, 99, 0.22);
+      }
+
+      .message-status {
+        min-height: 22px;
+        margin: 13px 0 0;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        text-align: center;
+      }
+
+      .message-status.success {
+        color: var(--success);
+      }
+
+      .message-status.error {
+        color: var(--error);
+      }
 
       @media (max-width: 420px) {
         body {
@@ -269,7 +364,59 @@
         accept="image/*"
         capture="environment"
       />
+      <section class="message-section">
+        <div class="divider">
+          <span>or</span>
+        </div>
 
+        <h2>Leave us a message</h2>
+
+        <p class="message-introduction">
+          Share a memory, some advice, or simply say hello.
+        </p>
+
+        <form id="message-form">
+          <label for="guest-name"> Your name </label>
+
+          <input
+            id="guest-name"
+            name="name"
+            type="text"
+            maxlength="100"
+            autocomplete="name"
+            placeholder="e.g. Sarah and Tom"
+            required
+          />
+
+          <label for="guest-message"> Your message </label>
+
+          <textarea
+            id="guest-message"
+            name="message"
+            maxlength="2000"
+            rows="5"
+            placeholder="Write us a message..."
+            required
+          ></textarea>
+
+          <button
+            id="message-button"
+            class="upload-button message-button"
+            type="submit"
+          >
+            <span class="button-icon" aria-hidden="true">💌</span>
+
+            Send us a message
+          </button>
+        </form>
+
+        <p
+          id="message-status"
+          class="message-status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
       <p class="hint">
         You can select several photos or videos at once. Please keep this page
         open until the upload completes.
@@ -282,7 +429,7 @@
         aria-live="polite"
       ></div>
 
-      <p class="footer-message">We cannot wait to see your memories ♡</p>
+      <p class="footer-message">♡</p>
     </main>
 
     <script>
@@ -432,6 +579,91 @@
           "This page needs a valid wedding QR-code link before files can be uploaded.",
           "error",
         );
+      }
+
+      messageForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const name = guestNameInput.value.trim();
+
+        const message = guestMessageInput.value.trim();
+
+        if (!eventToken) {
+          showMessageStatus(
+            "This message link is invalid. Please scan the wedding QR code again.",
+            "error",
+          );
+
+          return;
+        }
+
+        if (!name) {
+          showMessageStatus("Please enter your name.", "error");
+
+          guestNameInput.focus();
+          return;
+        }
+
+        if (!message) {
+          showMessageStatus("Please enter a message.", "error");
+
+          guestMessageInput.focus();
+          return;
+        }
+
+        messageButton.disabled = true;
+        messageButton.textContent = "Sending your message...";
+
+        showMessageStatus("Sending...", "");
+
+        try {
+          const response = await fetch("/api/message", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+
+              "x-event-token": eventToken,
+            },
+            body: JSON.stringify({
+              name,
+              message,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorMessage = await response.text();
+
+            throw new Error(errorMessage || "Your message could not be sent.");
+          }
+
+          messageForm.reset();
+
+          showMessageStatus(
+            "Your message has been sent — thank you! ♡",
+            "success",
+          );
+        } catch (error) {
+          console.error(error);
+
+          showMessageStatus(
+            error.message || "Something went wrong while sending your message.",
+            "error",
+          );
+        } finally {
+          messageButton.disabled = false;
+          messageButton.innerHTML = `
+                <span
+                    class="button-icon"
+                    aria-hidden="true"
+                >💌</span>
+                Send us a message
+            `;
+        }
+      });
+
+      function showMessageStatus(message, type) {
+        messageStatus.textContent = message;
+        messageStatus.className = `message-status ${type}`;
       }
     </script>
   </body>
