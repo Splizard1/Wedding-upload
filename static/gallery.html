@@ -247,11 +247,11 @@
         <h1>Our wedding gallery</h1>
 
         <p class="subtitle">
-          A collection of memories, photographs, videos and messages shared by
-          everyone celebrating with us.
+          Here be the photos and videos shared by our guests. Thank you for
+          being part of our special day!
         </p>
 
-        <a class="back-link" href="/"> Share something </a>
+        <a id="back-link" class="back-link" href="/"> Share something </a>
       </header>
 
       <div id="loading" class="loading">Loading the wedding memories…</div>
@@ -284,6 +284,14 @@
       const mediaCount = document.querySelector("#media-count");
 
       const mediaEmpty = document.querySelector("#media-empty");
+
+      const backLink = document.querySelector("#back-link");
+
+      const savedEventToken = sessionStorage.getItem("weddingEventToken");
+
+      if (savedEventToken) {
+        backLink.href = `/?code=${encodeURIComponent(savedEventToken)}`;
+      }
 
       function createMediaCard(item) {
         const card = document.createElement("article");
@@ -345,19 +353,17 @@
 
           const gallery = await response.json();
 
-          mediaCount.textContent =
-            `${gallery.media.length} shared item` +
-            `${gallery.media.length === 1 ? "" : "s"}`;
+          const media = Array.isArray(gallery.media) ? gallery.media : [];
 
-          for (const item of gallery.media) {
+          mediaCount.textContent =
+            `${media.length} shared item` + `${media.length === 1 ? "" : "s"}`;
+
+          for (const item of media) {
             mediaGrid.append(createMediaCard(item));
           }
 
-          mediaEmpty.hidden = gallery.media.length !== 0;
+          mediaEmpty.hidden = media.length !== 0;
           mediaSection.hidden = false;
-
-          mediaSection.hidden = false;
-          messageSection.hidden = false;
         } catch (error) {
           console.error(error);
 

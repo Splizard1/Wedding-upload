@@ -467,6 +467,10 @@
 
       const parameters = new URLSearchParams(window.location.search);
 
+      if (eventToken) {
+        sessionStorage.setItem("weddingEventToken", eventToken);
+      }
+
       const eventToken = parameters.get("code");
 
       function setStatus(message, type) {
